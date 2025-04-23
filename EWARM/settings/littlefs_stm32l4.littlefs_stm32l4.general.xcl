@@ -1,0 +1,15 @@
+"C:\Program Files (x86)\IAR Systems\Embedded Workbench 8.3-EWARM-8.40.2.22673-BETA\arm\bin\armproc.dll" 
+
+"C:\Program Files (x86)\IAR Systems\Embedded Workbench 8.3-EWARM-8.40.2.22673-BETA\arm\bin\armstlink2.dll" 
+
+"C:\MBOUSTM\Workspace\littlefs_stm32l4\EWARM\littlefs_stm32l4\Exe\littlefs_stm32l4.out" 
+
+--plugin="C:\Program Files (x86)\IAR Systems\Embedded Workbench 8.3-EWARM-8.40.2.22673-BETA\arm\bin\armbat.dll" 
+
+--device_macro="C:\Program Files (x86)\IAR Systems\Embedded Workbench 8.3-EWARM-8.40.2.22673-BETA\arm\config\debugger\ST\STM32L4xx.dmac" 
+
+--flash_loader="C:\Program Files (x86)\IAR Systems\Embedded Workbench 8.3-EWARM-8.40.2.22673-BETA\arm\config\flashloader\ST\FlashSTM32L4AxxG.board" 
+
+
+
+
