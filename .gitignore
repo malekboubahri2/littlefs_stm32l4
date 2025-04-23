@@ -1,1 +1,3 @@
 ./Drivers
+./EWARM/settings
+./EWARM/littlefs_stm32l4
