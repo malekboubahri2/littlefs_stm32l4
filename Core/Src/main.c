@@ -43,16 +43,16 @@
 SD_HandleTypeDef hsd1;
 
 /* USER CODE BEGIN PV */
-
+HAL_SD_CardInfoTypeDef pCardInfo;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_SDMMC1_SD_Init(void);
-int user_provided_block_device_read();
-int user_provided_block_device_prog();
-int user_provided_block_device_erase();
+int user_provided_block_device_read(const struct lfs_config *c, lfs_block_t block, lfs_off_t off, void* buffer, lfs_size_t size);
+int user_provided_block_device_prog(const struct lfs_config *c, lfs_block_t block, lfs_off_t off, const void* buffer, lfs_size_t size);
+int user_provided_block_device_erase(const struct lfs_config *c, lfs_block_t block);
 int user_provided_block_device_sync();
 /* USER CODE BEGIN PFP */
 
@@ -72,26 +72,8 @@ int main(void)
 
   /* USER CODE BEGIN 1 */
 // variables used by the filesystem
-lfs_t lfs;
-lfs_file_t file;
-
-// configuration of the filesystem is provided by this struct
-const struct lfs_config cfg = {
-    // block device operations
-    .read  = user_provided_block_device_read,
-    .prog  = user_provided_block_device_prog,
-    .erase = user_provided_block_device_erase,
-    .sync  = user_provided_block_device_sync,
-
-    // block device configuration
-    .read_size = 16,
-    .prog_size = 16,
-    .block_size = 4096,
-    .block_count = 128,
-    .cache_size = 16,
-    .lookahead_size = 16,
-    .block_cycles = 500,
-};
+  lfs_t lfs;
+  lfs_file_t file;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -114,6 +96,29 @@ const struct lfs_config cfg = {
   MX_GPIO_Init();
   MX_SDMMC1_SD_Init();
   /* USER CODE BEGIN 2 */
+  
+  if (HAL_SD_GetCardInfo(&hsd1, &pCardInfo) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  // configuration of the filesystem is provided by this struct
+const struct lfs_config cfg = {
+    // block device operations
+    .read  = user_provided_block_device_read,
+    .prog  = user_provided_block_device_prog,
+    .erase = user_provided_block_device_erase,
+    .sync  = user_provided_block_device_sync,
+
+    // block device configuration
+    .read_size = pCardInfo.BlockSize,
+    .prog_size = pCardInfo.BlockSize,
+    .block_size = pCardInfo.BlockSize,
+    .block_count = pCardInfo.BlockNbr,
+    .cache_size = pCardInfo.BlockSize,
+    .lookahead_size = 16,
+    .block_cycles = 500,
+};
+   
     // mount the filesystem
     int err = lfs_mount(&lfs, &cfg);
 
@@ -231,10 +236,6 @@ static void MX_SDMMC1_SD_Init(void)
   {
     Error_Handler();
   }
-  if (HAL_SD_ConfigWideBusOperation(&hsd1, SDMMC_BUS_WIDE_4B) != HAL_OK)
-  {
-    Error_Handler();
-  }
   /* USER CODE BEGIN SDMMC1_Init 2 */
 
   /* USER CODE END SDMMC1_Init 2 */
@@ -260,22 +261,36 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-__WEAK int user_provided_block_device_read()
+__WEAK int user_provided_block_device_read(const struct lfs_config *c, lfs_block_t block, lfs_off_t off, void* buffer, lfs_size_t size)
 {
-  // to be implemented
-  return 0;
+    assert(block < c->block_count);
+    assert(off + size <= c->block_size);
+    
+    if ( HAL_SD_ReadBlocks(&hsd1, (uint8_t *) buffer, block + off, size, HAL_TIMEOUT) != HAL_OK){
+      return LFS_ERR_INVAL;
+    }
+
+    return LFS_ERR_OK;
 }
 
-__WEAK int user_provided_block_device_prog()
+__WEAK int user_provided_block_device_prog(const struct lfs_config *c, lfs_block_t block, lfs_off_t off, const void* buffer, lfs_size_t size)
 {
-  // to be implemented
-  return 0;
+    assert(block < c->block_count);
+    if ( HAL_SD_WriteBlocks(&hsd1, (uint8_t *) buffer, block + off, size, HAL_TIMEOUT) != HAL_OK){
+      return LFS_ERR_INVAL;
+    }
+  
+  return LFS_ERR_OK;
 }
 
-__WEAK int user_provided_block_device_erase()
+__WEAK int user_provided_block_device_erase(const struct lfs_config *c, lfs_block_t block)
 {
-  // to be implemented
-  return 0;
+  assert(block < c->block_count);
+  if (HAL_SD_Erase(&hsd1, block, block+1) != HAL_OK)
+  {
+    return LFS_ERR_INVAL;
+  }
+  return LFS_ERR_OK;
 }
 
 __WEAK int user_provided_block_device_sync()
