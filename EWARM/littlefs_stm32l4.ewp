@@ -226,7 +226,9 @@
                     <name>CCDefines</name>
                     <state>USE_HAL_DRIVER</state>
                     <state>STM32L496xx</state>
-                    <state>LFS_YES_TRACE</state>
+                    <state>LFS_MIGRATE</state>
+                    <state>LFS_NO_DEBUG</state>
+                    <state>NDEBUG</state>
                 </option>
                 <option>
                     <name>CCPreprocFile</name>

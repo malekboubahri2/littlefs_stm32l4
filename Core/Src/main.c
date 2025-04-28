@@ -50,12 +50,11 @@ HAL_SD_CardInfoTypeDef pCardInfo;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_SDMMC1_SD_Init(void);
+/* USER CODE BEGIN PFP */
 int user_provided_block_device_read(const struct lfs_config *c, lfs_block_t block, lfs_off_t off, void* buffer, lfs_size_t size);
 int user_provided_block_device_prog(const struct lfs_config *c, lfs_block_t block, lfs_off_t off, const void* buffer, lfs_size_t size);
 int user_provided_block_device_erase(const struct lfs_config *c, lfs_block_t block);
 int user_provided_block_device_sync();
-/* USER CODE BEGIN PFP */
-
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -110,30 +109,32 @@ const struct lfs_config cfg = {
     .sync  = user_provided_block_device_sync,
 
     // block device configuration
-    .read_size = pCardInfo.BlockSize,
-    .prog_size = pCardInfo.BlockSize,
-    .block_size = pCardInfo.BlockSize,
+    .read_size = pCardInfo.BlockSize / 2,
+    .prog_size = pCardInfo.BlockSize / 2,
+    .block_size = pCardInfo.BlockSize / 2,
     .block_count = pCardInfo.BlockNbr,
-    .cache_size = pCardInfo.BlockSize,
-    .lookahead_size = 16,
+    .cache_size = pCardInfo.BlockSize / 2,
+    .lookahead_size = 32,
     .block_cycles = 500,
 };
    
-    // mount the filesystem
+        // mount the filesystem
     int err = lfs_mount(&lfs, &cfg);
 
-    // reformat if we can't mount the filesystem
+
+// reformat if we can't mount the filesystem
     // this should only happen on the first boot
     if (err) {
         lfs_format(&lfs, &cfg);
         lfs_mount(&lfs, &cfg);
     }
-
-    // read current count
+    
+        // read current count
     uint32_t boot_count = 0;
+  
     lfs_file_open(&lfs, &file, "boot_count", LFS_O_RDWR | LFS_O_CREAT);
     lfs_file_read(&lfs, &file, &boot_count, sizeof(boot_count));
-
+    
     // update boot count
     boot_count += 1;
     lfs_file_rewind(&lfs, &file);
@@ -147,6 +148,8 @@ const struct lfs_config cfg = {
 
     // print the boot count
     printf("boot_count: %d\n", boot_count);
+    
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -182,14 +185,14 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_MSI;
   RCC_OscInitStruct.MSIState = RCC_MSI_ON;
   RCC_OscInitStruct.MSICalibrationValue = 0;
-  RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_9;
+  RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_6;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_MSI;
-  RCC_OscInitStruct.PLL.PLLM = 5;
-  RCC_OscInitStruct.PLL.PLLN = 71;
+  RCC_OscInitStruct.PLL.PLLM = 1;
+  RCC_OscInitStruct.PLL.PLLN = 20;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
-  RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV6;
+  RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -200,11 +203,11 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV4;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
     Error_Handler();
   }
@@ -230,9 +233,13 @@ static void MX_SDMMC1_SD_Init(void)
   hsd1.Init.ClockBypass = SDMMC_CLOCK_BYPASS_DISABLE;
   hsd1.Init.ClockPowerSave = SDMMC_CLOCK_POWER_SAVE_DISABLE;
   hsd1.Init.BusWide = SDMMC_BUS_WIDE_4B;
-  hsd1.Init.HardwareFlowControl = SDMMC_HARDWARE_FLOW_CONTROL_DISABLE;
+  hsd1.Init.HardwareFlowControl = SDMMC_HARDWARE_FLOW_CONTROL_ENABLE;
   hsd1.Init.ClockDiv = 0;
   if (HAL_SD_Init(&hsd1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_SD_ConfigWideBusOperation(&hsd1, SDMMC_BUS_WIDE_4B) != HAL_OK)
   {
     Error_Handler();
   }
@@ -265,8 +272,9 @@ __WEAK int user_provided_block_device_read(const struct lfs_config *c, lfs_block
 {
     assert(block < c->block_count);
     assert(off + size <= c->block_size);
-    
-    if ( HAL_SD_ReadBlocks(&hsd1, (uint8_t *) buffer, block + off, size, HAL_TIMEOUT) != HAL_OK){
+    size = size / 512;
+    int errorstate = HAL_SD_ReadBlocks(&hsd1, (uint8_t *) buffer, block + off, size, HAL_TIMEOUT);
+    if ( errorstate != HAL_OK){
       return LFS_ERR_INVAL;
     }
 
@@ -276,7 +284,10 @@ __WEAK int user_provided_block_device_read(const struct lfs_config *c, lfs_block
 __WEAK int user_provided_block_device_prog(const struct lfs_config *c, lfs_block_t block, lfs_off_t off, const void* buffer, lfs_size_t size)
 {
     assert(block < c->block_count);
-    if ( HAL_SD_WriteBlocks(&hsd1, (uint8_t *) buffer, block + off, size, HAL_TIMEOUT) != HAL_OK){
+    size = size / 512;
+    HAL_Delay(100);
+    int errorstate = HAL_SD_WriteBlocks(&hsd1, (uint8_t *) buffer, block + off, size, HAL_TIMEOUT);
+    if ( errorstate != HAL_OK){
       return LFS_ERR_INVAL;
     }
   
@@ -286,7 +297,8 @@ __WEAK int user_provided_block_device_prog(const struct lfs_config *c, lfs_block
 __WEAK int user_provided_block_device_erase(const struct lfs_config *c, lfs_block_t block)
 {
   assert(block < c->block_count);
-  if (HAL_SD_Erase(&hsd1, block, block+1) != HAL_OK)
+  int errorstate = HAL_SD_Erase(&hsd1, block, block+1);
+  if ( errorstate != HAL_OK)
   {
     return LFS_ERR_INVAL;
   }
